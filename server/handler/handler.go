@@ -17,11 +17,11 @@ type Handler interface {
 
 func New(options ...Option) (Handler, error) {
 
-	h := &handler{}
-
-	ClientIP(defaultClientIP)(h)
-	ClientPortRange(defaultClientPortLower, defaultClientPortUpper)(h)
-	Logger(log.New(ioutil.Discard, ``, 0))(h)
+	h := &handler{
+		clientIP:     net.ParseIP(defaultClientIP),
+		portRegistry: portreg.New(defaultClientPortLower, defaultClientPortUpper),
+		logger:       log.New(ioutil.Discard, ``, 0),
+	}
 
 	for _, option := range options {
 		if err := option(h); err != nil {

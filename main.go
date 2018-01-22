@@ -8,13 +8,24 @@ import (
 	"syscall"
 
 	"github.com/RobertGrantEllis/httptun/server"
+	"github.com/RobertGrantEllis/httptun/server/handler"
+	"github.com/fatih/color"
 )
 
 func main() {
 
 	logger := log.New(os.Stdout, `httptun `, log.LstdFlags)
 
-	s := server.MustInstantiate(server.Logger(logger))
+	h, err := handler.New(handler.Logger(logger))
+	if err != nil {
+		fail(err)
+	}
+
+	s, err := server.New(server.Handler(h), server.Logger(logger))
+	if err != nil {
+		fail(err)
+	}
+
 	if err := s.Start(); err != nil {
 		panic(err)
 	}
@@ -38,4 +49,10 @@ func waitUntilInterrupt(s server.Server) {
 	}()
 
 	s.Wait()
+}
+
+func fail(err error) {
+
+	fmt.Printf("%s: %s\n", color.RedString(`error`), err.Error())
+	os.Exit(1)
 }

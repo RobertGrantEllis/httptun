@@ -18,38 +18,20 @@ type Server interface {
 	Wait()
 }
 
-type server struct {
-	mu *sync.Mutex
-	wg *sync.WaitGroup
-
-	logger *log.Logger
-
-	// tunnel listener specification
-	tunnelIP        net.IP
-	tunnelPort      int
-	tunnelTlsConfig *tls.Config
-
-	// listener derived from specification above
-	listener net.Listener
-
-	// tunnel request handler
-	handler handler.Handler
-
-	// TODO: Simple API for looking up what tunnels are established
-}
-
 func New(options ...Option) (Server, error) {
+
+	logger := log.New(ioutil.Discard, ``, 0)
 
 	// initialize
 	s := &server{
-		mu: &sync.Mutex{},
-		wg: &sync.WaitGroup{},
+		mu:         &sync.Mutex{},
+		wg:         &sync.WaitGroup{},
+		logger:     logger,
+		tunnelIP:   net.ParseIP(defaultTunnelIP),
+		tunnelPort: defaultTunnelPort,
+		handler:    nil, // set below
+		listener:   nil, // set at runtime
 	}
-
-	// defaultify
-	Logger(log.New(ioutil.Discard, ``, 0))(s)
-	TunnelIP(defaultTunnelIP)(s)
-	TunnelPort(defaultTunnelPort)(s)
 
 	// apply all other options designated by developer
 	for _, option := range options {
@@ -59,8 +41,7 @@ func New(options ...Option) (Server, error) {
 	}
 
 	if s.handler == nil {
-		// do this later in case the logger was set within the designated options
-		Handler(handler.MustInstantiate(handler.Logger(s.logger)))(s)
+		s.handler = handler.MustInstantiate(handler.Logger(logger))
 	}
 
 	return s, nil
@@ -74,6 +55,25 @@ func MustInstantiate(options ...Option) Server {
 	}
 
 	return s
+}
+
+type server struct {
+	mu     *sync.Mutex
+	wg     *sync.WaitGroup
+	logger *log.Logger
+
+	// tunnel listener specification
+	tunnelIP        net.IP
+	tunnelPort      int
+	tunnelTlsConfig *tls.Config
+
+	// tunnel request handler
+	handler handler.Handler
+
+	// listener derived from specification above
+	listener net.Listener
+
+	// TODO: Simple API for looking up what tunnels are established
 }
 
 func (s *server) Start() error {
@@ -96,10 +96,10 @@ func (s *server) Stop() {
 	defer s.mu.Unlock()
 
 	if s.listener != nil {
-		listener := s.listener
-		s.listener = nil // so that when server stops, no error hits the log
-		listener.Close() // now close the listener
-		s.wg.Done()
+		listener := s.listener // capture the listener so we can set it to nil on the next line
+		s.listener = nil       // so that when server stops, no error hits the log
+		listener.Close()       // now close the listener
+		s.wg.Done()            // decrement for the listener we closed
 	}
 }
 
@@ -130,7 +130,7 @@ func (s *server) listen() error {
 		l = tls.NewListener(l, s.tunnelTlsConfig)
 	}
 
-	s.wg.Add(1)
+	s.wg.Add(1) // increment for the listener we just instantiated
 
 	s.listener = l
 	return nil
@@ -138,7 +138,7 @@ func (s *server) listen() error {
 
 func (s *server) serve() {
 
-	s.wg.Add(1) // for the server we are about to start
+	s.wg.Add(1) // increment for the server we are about to start
 	go func() {
 
 		scheme := `http`
