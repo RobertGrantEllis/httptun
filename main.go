@@ -5,14 +5,40 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+
+	"github.com/fatih/color"
+	"github.com/pkg/errors"
 
 	"github.com/RobertGrantEllis/httptun/server"
 	"github.com/RobertGrantEllis/httptun/server/handler"
-	"github.com/fatih/color"
 )
 
 func main() {
+
+	if len(os.Args) < 2 {
+		fail(errors.New(`subcommand is required`))
+	}
+
+	subcommand, args := strings.ToLower(os.Args[1]), os.Args[1:]
+
+	switch subcommand {
+	case `client`:
+		startClient(args...)
+	case `server`:
+		startServer(args...)
+	default:
+		fail(errors.Errorf(`invalid subcommand: must be 'client' or 'server' (got '%s')`, subcommand))
+	}
+}
+
+func startClient(args ...string) {
+
+	fail(errors.New(`client not yet implemented`))
+}
+
+func startServer(args ...string) {
 
 	logger := log.New(os.Stdout, `httptun `, log.LstdFlags)
 
