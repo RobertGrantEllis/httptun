@@ -33,7 +33,7 @@ func ClientExpose() Option {
 
 func ClientPortRange(portLower, portUpper int) Option {
 
-	return func(h *handler) error {
+	return Option(func(h *handler) error {
 
 		if err := shared.ValidatePort(portLower); err != nil {
 			return err
@@ -46,12 +46,12 @@ func ClientPortRange(portLower, portUpper int) Option {
 		h.portRegistry = portreg.New(portLower, portUpper)
 
 		return nil
-	}
+	})
 }
 
 func Logger(logger *log.Logger) Option {
 
-	return func(h *handler) error {
+	return Option(func(h *handler) error {
 
 		if logger == nil {
 			return errors.New(`invalid logger: nil`)
@@ -59,5 +59,5 @@ func Logger(logger *log.Logger) Option {
 
 		h.logger = logger
 		return nil
-	}
+	})
 }

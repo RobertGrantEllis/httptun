@@ -50,6 +50,5 @@ type handler struct {
 
 func (h *handler) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
-	//TODO
 	h.logger.Print(`got request`)
 }

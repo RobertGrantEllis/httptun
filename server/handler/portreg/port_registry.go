@@ -2,18 +2,16 @@ package portreg
 
 import (
 	"sync"
-
-	"github.com/pkg/errors"
 )
 
 type PortRegistry interface {
-	Allocate() (int, error)
+	Allocate() int
 	Release(int)
 }
 
 type portRegistry struct {
 	allocated   map[int]bool
-	unallocated []int
+	unallocated chan int
 	mutex       *sync.Mutex
 }
 
@@ -26,10 +24,10 @@ func New(min, max int) PortRegistry {
 	num := max - min + 1
 
 	allocated := make(map[int]bool, num)
-	unallocated := make([]int, num)
+	unallocated := make(chan int, num)
 
 	for i := min; i <= max; i++ {
-		unallocated = append(unallocated, i)
+		unallocated <- i
 	}
 
 	return &portRegistry{
@@ -39,24 +37,9 @@ func New(min, max int) PortRegistry {
 	}
 }
 
-func (pr *portRegistry) Allocate() (int, error) {
+func (pr *portRegistry) Allocate() int {
 
-	var port int
-
-	pr.mutex.Lock()
-
-	if len(pr.unallocated) > 0 {
-		port, pr.unallocated = pr.unallocated[0], pr.unallocated[1:]
-		pr.allocated[port] = true
-	}
-
-	pr.mutex.Unlock()
-
-	if port == 0 {
-		return 0, errors.New(`cannot allocate port`)
-	}
-
-	return port, nil
+	return <-pr.unallocated
 }
 
 func (pr *portRegistry) Release(port int) {
@@ -64,7 +47,7 @@ func (pr *portRegistry) Release(port int) {
 	pr.mutex.Lock()
 	if pr.allocated[port] {
 		delete(pr.allocated, port)
-		pr.unallocated = append(pr.unallocated, port)
+		pr.unallocated <- port
 	}
 	pr.mutex.Unlock()
 }
