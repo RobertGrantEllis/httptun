@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/RobertGrantEllis/httptun/server/handler"
 	"github.com/pkg/errors"
 )
 
@@ -31,13 +30,14 @@ func New(options ...Option) (Server, error) {
 
 	// initialize
 	s := &server{
-		mu:         &sync.Mutex{},
-		wg:         &sync.WaitGroup{},
-		logger:     logger,
-		tunnelIP:   net.ParseIP(defaultTunnelIP),
-		tunnelPort: defaultTunnelPort,
-		handler:    nil, // set below
-		listener:   nil, // set at runtime
+		mu:           &sync.Mutex{},
+		wg:           &sync.WaitGroup{},
+		logger:       logger,
+		tunnelIP:     net.ParseIP(defaultTunnelIP),
+		tunnelPort:   defaultTunnelPort,
+		clientIP:     net.ParseIP(defaultClientIP),
+		portRegistry: newPortRegistry(defaultClientPortLower, defaultClientPortUpper),
+		listener:     nil, // set at runtime
 	}
 
 	// apply all other options designated by developer
@@ -45,10 +45,6 @@ func New(options ...Option) (Server, error) {
 		if err := option(s); err != nil {
 			return nil, errors.Wrap(err, `cannot instantiate Server`)
 		}
-	}
-
-	if s.handler == nil {
-		s.handler = handler.MustInstantiate(handler.Logger(logger))
 	}
 
 	return s, nil
@@ -75,8 +71,9 @@ type server struct {
 	tunnelPort      int
 	tunnelTlsConfig *tls.Config
 
-	// tunnel request handler
-	handler handler.Handler
+	// client listener specification
+	clientIP     net.IP
+	portRegistry *portRegistry
 
 	// listener derived from specification above
 	listener net.Listener
@@ -155,7 +152,7 @@ func (s *server) serve() {
 		}
 
 		server := &http.Server{
-			Handler:  s.handler,
+			Handler:  http.HandlerFunc(s.handle),
 			ErrorLog: s.logger,
 		}
 

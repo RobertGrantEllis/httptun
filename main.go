@@ -12,24 +12,23 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/RobertGrantEllis/httptun/server"
-	"github.com/RobertGrantEllis/httptun/server/handler"
 )
 
 func main() {
 
 	if len(os.Args) < 2 {
-		fail(errors.New(`subcommand is required`))
+		fail(errors.New(`subcommand is required: must be 'connect' or 'serve'`))
 	}
 
 	subcommand, args := strings.ToLower(os.Args[1]), os.Args[1:]
 
 	switch subcommand {
-	case `client`:
+	case `connect`:
 		startClient(args...)
-	case `server`:
+	case `serve`:
 		startServer(args...)
 	default:
-		fail(errors.Errorf(`invalid subcommand: must be 'client' or 'server' (got '%s')`, subcommand))
+		fail(errors.Errorf(`invalid subcommand: must be 'connect' or 'serve' (got '%s')`, subcommand))
 	}
 }
 
@@ -42,12 +41,7 @@ func startServer(args ...string) {
 
 	logger := log.New(os.Stdout, `httptun `, log.LstdFlags)
 
-	h, err := handler.New(handler.Logger(logger))
-	if err != nil {
-		fail(err)
-	}
-
-	s, err := server.New(server.Handler(h), server.Logger(logger))
+	s, err := server.New(server.Logger(logger))
 	if err != nil {
 		fail(err)
 	}
