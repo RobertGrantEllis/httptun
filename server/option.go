@@ -9,8 +9,10 @@ import (
 	"github.com/RobertGrantEllis/httptun/shared"
 )
 
+// Option may be passed to New or MustInstantiate to configure the Server that is returned.
 type Option func(*server) error
 
+// TunnelIP configures the IP address on which the Server listens on for httptun Clients.
 func TunnelIP(ipString string) Option {
 
 	return func(s *server) error {
@@ -26,12 +28,13 @@ func TunnelIP(ipString string) Option {
 	}
 }
 
-// sugar
+// TunnelExpose configures the Server to listen on all interfaces.
 func TunnelExpose() Option {
 
 	return TunnelIP(`0.0.0.0`)
 }
 
+// TunnelPort configures the port on which the Server listens for httptun Clients.
 func TunnelPort(port int) Option {
 
 	return func(s *server) error {
@@ -46,6 +49,7 @@ func TunnelPort(port int) Option {
 	}
 }
 
+// TunnelTlsConfig configures TLS handling for httptun Clients.
 func TunnelTlsConfig(config *tls.Config) Option {
 
 	return func(s *server) error {
@@ -64,6 +68,7 @@ func TunnelTlsConfig(config *tls.Config) Option {
 	}
 }
 
+// Logger configures the Logger for Server
 func Logger(logger *log.Logger) Option {
 
 	return func(s *server) error {
@@ -77,6 +82,8 @@ func Logger(logger *log.Logger) Option {
 	}
 }
 
+// Handler configures the Handler for Server
+// TODO: stop breaking out the Handler module. this should not be configurable
 func Handler(h handler.Handler) Option {
 
 	return func(s *server) error {

@@ -10,6 +10,7 @@ import (
 
 type Option func(*handler) error
 
+//TODO: better differentiate the client ip from the tunnel ip
 func ClientIP(ipString string) Option {
 
 	return func(h *handler) error {

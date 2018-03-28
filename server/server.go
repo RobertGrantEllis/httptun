@@ -12,12 +12,19 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Server implements an httptun server that accepts incoming requests from httptun clients and then opens a
+// port for accessing that tunnel.
 type Server interface {
+	// Starts the Server (non-blocking)
 	Start() error
+	// Stops the server
 	Stop()
+	// Blocks until server is stopped
 	Wait()
 }
 
+// Instantiates a default Server and then applies any number of Options.
+// If any of the Options are invalid, then an error will be returned.
 func New(options ...Option) (Server, error) {
 
 	logger := log.New(ioutil.Discard, ``, 0)
@@ -47,6 +54,7 @@ func New(options ...Option) (Server, error) {
 	return s, nil
 }
 
+// Instantiates a new Server with the designated Options. Panics if any of the Options are invalid.
 func MustInstantiate(options ...Option) Server {
 
 	s, err := New(options...)
