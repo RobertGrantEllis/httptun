@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -87,10 +88,12 @@ func (s *server) Start() error {
 	defer s.mu.Unlock()
 
 	if err := s.listen(); err != nil {
-		return errors.Wrap(err, `could not start server`)
+		return errors.Wrap(err, `could not start listener`)
 	}
 
-	s.serve()
+	if err := s.serve(); err != nil {
+		return errors.Wrap(err, `could not start server`)
+	}
 
 	return nil
 }
@@ -101,10 +104,8 @@ func (s *server) Stop() {
 	defer s.mu.Unlock()
 
 	if s.listener != nil {
-		listener := s.listener // capture the listener so we can set it to nil on the next line
-		s.listener = nil       // so that when server stops, no error hits the log
-		listener.Close()       // now close the listener
-		s.wg.Done()            // decrement for the listener we closed
+		s.listener.Close()
+		s.listener = nil
 	}
 }
 
@@ -135,38 +136,50 @@ func (s *server) listen() error {
 		l = tls.NewListener(l, s.tunnelTlsConfig)
 	}
 
-	s.wg.Add(1) // increment for the listener we just instantiated
-
 	s.listener = l
 	return nil
 }
 
-func (s *server) serve() {
+func (s *server) serve() error {
 
 	s.wg.Add(1) // increment for the server we are about to start
-	go func() {
 
-		scheme := `http`
-		if s.tunnelTlsConfig != nil {
-			scheme = `https`
-		}
+	scheme := `http`
+	if s.tunnelTlsConfig != nil {
+		scheme = `https`
+	}
 
-		server := &http.Server{
-			Handler:  http.HandlerFunc(s.handle),
-			ErrorLog: s.logger,
-		}
+	server := &http.Server{
+		Handler:  http.HandlerFunc(s.handle),
+		ErrorLog: s.logger,
+	}
+
+	errChan := make(chan error, 1)
+
+	go func(ch chan<- error) {
 
 		s.logger.Printf(`starting service at %s://%s`, scheme, s.listener.Addr().String())
+
 		if err := server.Serve(s.listener); err != nil {
 			if s.listener != nil {
 				// abnormal quit
-				s.logger.Print(`server terminated: %s`, err.Error())
+				err = errors.Wrap(err, `server terminated`)
 			} else {
 				// listener was closed so we are deliberately shutting down
-				s.logger.Print(`server terminated`)
+				err = nil
 			}
+
+			ch <- err
 		}
 
-		s.wg.Done() // server returned so decrement waitgroup
-	}()
+		s.wg.Done()
+		close(errChan)
+	}(errChan)
+
+	select {
+	case err := <-errChan:
+		return err
+	case <-time.After(10 * time.Millisecond):
+		return nil
+	}
 }
